@@ -27,8 +27,7 @@ pip install -r requirements.txt
 # Creating degraded images
 1. First Upload your images in the images/ folder
 2. then modify degrade.py to add your image names to IMAGE_NAME
-3. Make sure the folder images/degraded exists
-4. execute:
+3. execute:
 ```bash
 python degrade.py
 ```
