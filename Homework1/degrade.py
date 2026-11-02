@@ -4,7 +4,7 @@ import numpy as np
 """
 This script slightly reduces contrast and adds noise to the images
 """
-
+np.random.seed(42)
 
 IMAGES_NAMES = ["low_light.png", "outside.png", "cave.png"]
 

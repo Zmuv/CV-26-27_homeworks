@@ -82,7 +82,7 @@ for image_name in IMAGES_NAMES:
 
     # Create a LUT as there are only 256 possible values
     # Gamma correction: gamma < 1 brightens
-    gamma = 0.7
+    gamma = 0.9
     lut = (
         np.array([255 * (i / 255) ** gamma for i in range(256)])
         .clip(0, 255)
@@ -101,12 +101,14 @@ for image_name in IMAGES_NAMES:
         "Linear stretch (RGB)": (out_image_rgb, "linear_stretch_rgb"),
         "Linear stretch (HLS)": (out_image_hls, "linear_stretch_hls"),
         "Hist. equalization (HSV)": (out_image_hsv, "histogram_equalization"),
-        "Bilateral + gamma": (out_image_gamma, "bilateral_gamma"),
+        "Bilateral + gamma": (image_smooth, "bilateral_gamma"),
     }
 
     # The degraded image itself is the baseline
     print(image_name)
-    print(f"Degraded: PSNR {cv2.PSNR(original, image):.2f}, MSE {mse(original, image):.1f}")
+    degraded_psnr = cv2.PSNR(original, image)
+    degraded_error = mse(original, image)
+    print(f"Degraded: PSNR {degraded_psnr:.2f}, MSE {degraded_error:.1f}")
 
     name = os.path.splitext(image_name)[0]
 
@@ -121,7 +123,7 @@ for image_name in IMAGES_NAMES:
 
         row = [
             ("Original", original),
-            ("Degraded", image),
+            (f"Degraded\nPSNR {degraded_psnr:.2f} dB, MSE {degraded_error:.1f}", image),
             (f"{method}\nPSNR {psnr:.2f} dB, MSE {error:.1f}", result),
         ]
         for j, (title, img) in enumerate(row):
