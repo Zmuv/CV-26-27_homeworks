@@ -1,0 +1,16 @@
+image,method,psnr,mse
+low_light.png,Degraded,21.94,416.2
+low_light.png,Linear stretch (RGB),17.10,1268.2
+low_light.png,Linear stretch (HLS),13.28,3053.1
+low_light.png,Hist. equalization (HSV),9.28,7682.6
+low_light.png,Bilateral + gamma,27.69,110.6
+outside.png,Degraded,17.10,1269.3
+outside.png,Linear stretch (RGB),17.05,1283.7
+outside.png,Linear stretch (HLS),16.66,1403.5
+outside.png,Hist. equalization (HSV),17.22,1232.6
+outside.png,Bilateral + gamma,19.27,768.9
+cave.png,Degraded,18.11,1004.3
+cave.png,Linear stretch (RGB),18.11,1004.3
+cave.png,Linear stretch (HLS),18.15,996.7
+cave.png,Hist. equalization (HSV),11.47,4633.3
+cave.png,Bilateral + gamma,20.52,576.7

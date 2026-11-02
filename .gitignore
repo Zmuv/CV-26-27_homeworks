@@ -1,5 +1,9 @@
 .DS_store
 
+histogram_equalization
+linear_stretch
+smoothing_gamma
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -12,6 +12,9 @@ def mse(a, b):
 
 
 os.makedirs("./images/output/comparison", exist_ok=True)
+os.makedirs("./images/output/linear_stretch", exist_ok=True)
+os.makedirs("./images/output/histogram_equalization", exist_ok=True)
+os.makedirs("./images/output/smoothing_gamma", exist_ok=True)
 
 for image_name in IMAGES_NAMES:
     image_filepath = f"./images/degraded/{image_name}"
@@ -41,7 +44,7 @@ for image_name in IMAGES_NAMES:
 
     # Merge the channels back
     out_image_rgb = cv2.merge([new_b, new_g, new_r])
-    # cv2.imwrite(f'./images/output/linear_stretch/rgb_{image_name}', out_image_rgb)
+    cv2.imwrite(f'./images/output/linear_stretch/rgb_{image_name}', out_image_rgb)
 
     # LUMINANCE VERSION
     # Separate the channels
@@ -57,7 +60,7 @@ for image_name in IMAGES_NAMES:
     # Merge the channels back
     out_image_hls = cv2.cvtColor(cv2.merge([h, new_l, s]), cv2.COLOR_HLS2BGR)
 
-    # cv2.imwrite(f'./images/output/linear_stretch/hls_{image_name}', out_image_hls)
+    cv2.imwrite(f'./images/output/linear_stretch/hls_{image_name}', out_image_hls)
 
     # -- Histogram equalization --
 
@@ -72,7 +75,7 @@ for image_name in IMAGES_NAMES:
     # Merge the channels and convert back to bgr
     out_image_hsv = cv2.cvtColor(cv2.merge([h, s, new_v]), cv2.COLOR_HSV2BGR)
 
-    # cv2.imwrite(f"./images/output/histogram_equalization/{image_name}", out_image_hsv)
+    cv2.imwrite(f"./images/output/histogram_equalization/{image_name}", out_image_hsv)
 
     # -- Denoising + Gamma correction --
     # Apply bilater filter
@@ -92,7 +95,7 @@ for image_name in IMAGES_NAMES:
     # Each value is given directly by the LUT
     out_image_gamma = cv2.LUT(image_smooth, lut)
 
-    # cv2.imwrite(f"./images/output/smoothing/{image_name}", out_image_gamma)
+    cv2.imwrite(f"./images/output/smoothing_gamma/{image_name}", out_image_gamma)
 
     # -- Comparison and metrics --
 
@@ -101,7 +104,7 @@ for image_name in IMAGES_NAMES:
         "Linear stretch (RGB)": (out_image_rgb, "linear_stretch_rgb"),
         "Linear stretch (HLS)": (out_image_hls, "linear_stretch_hls"),
         "Hist. equalization (HSV)": (out_image_hsv, "histogram_equalization"),
-        "Bilateral + gamma": (image_smooth, "bilateral_gamma"),
+        "Bilateral + gamma": (out_image_gamma, "bilateral_gamma"),
     }
 
     # The degraded image itself is the baseline
@@ -144,5 +147,4 @@ for image_name in IMAGES_NAMES:
         fig.savefig(f"./images/output/comparison/{name}_{fig_name}.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
 
-    print("Results saved to ./images/output/comparison/")
-    print()
+    print("Results saved to ./images/output/")
