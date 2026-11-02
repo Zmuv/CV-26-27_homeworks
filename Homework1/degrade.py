@@ -6,7 +6,7 @@ This script slightly reduces contrast and adds noise to the images
 """
 
 
-IMAGES_NAMES = ["low_light.png", "outside.png"]
+IMAGES_NAMES = ["low_light.png", "outside.png", "cave.png"]
 
 
 for image_name in IMAGES_NAMES:

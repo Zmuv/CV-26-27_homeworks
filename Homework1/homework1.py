@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-IMAGES_NAMES = ["low_light.png", "outside.png"]
+IMAGES_NAMES = ["low_light.png", "outside.png", "cave.png"]
 
 
 def mse(a, b):
