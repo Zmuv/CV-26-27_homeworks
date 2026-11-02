@@ -116,7 +116,8 @@ for image_name in IMAGES_NAMES:
         print(f"{method}: PSNR {psnr:.2f}, MSE {error:.1f}")
 
         # One figure per method: original, degraded, result
-        fig, axes = plt.subplots(1, 3, figsize=(9, 4))
+        # with the grayscale histogram of each image below it
+        fig, axes = plt.subplots(2, 3, figsize=(9, 6), height_ratios=[3, 1])
 
         row = [
             ("Original", original),
@@ -125,9 +126,17 @@ for image_name in IMAGES_NAMES:
         ]
         for j, (title, img) in enumerate(row):
             # matplotlib expects RGB, OpenCV gives BGR
-            axes[j].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-            axes[j].set_title(title, fontsize=9)
-            axes[j].axis("off")
+            axes[0, j].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            axes[0, j].set_title(title, fontsize=9)
+            axes[0, j].axis("off")
+
+            # Histogram of the intensities (256 bins, one per value)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+            axes[1, j].plot(hist, color="black", linewidth=0.8)
+            axes[1, j].set_xlim(0, 255)
+            axes[1, j].set_yticks([])
+            axes[1, j].tick_params(labelsize=7)
 
         fig.tight_layout()
         fig.savefig(f"./images/output/comparison/{name}_{fig_name}.png", dpi=150, bbox_inches="tight")
