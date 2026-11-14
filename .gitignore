@@ -4,6 +4,9 @@ histogram_equalization
 linear_stretch
 smoothing_gamma
 
+
+dataset
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
