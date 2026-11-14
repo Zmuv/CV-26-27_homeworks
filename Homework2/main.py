@@ -1,4 +1,5 @@
 import copy
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,6 +16,7 @@ import matplotlib.pyplot as plt
 import time
 
 torch.manual_seed(42)
+np.random.seed(42)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.mps.is_available() else "cpu")
 print(f"Using device: {device}\n")
@@ -27,6 +29,26 @@ def sync():
     elif device.type == "mps":
         torch.mps.synchronize()
 
+def get_accuracy(model, loader):
+  model.eval()
+  y_pred, y_gt = [], []
+  correct = 0
+  total = 0
+  with torch.no_grad():
+    for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
+        outputs = model(images)
+        
+        # Predicted class is index of highest logit along dimension 1
+        _, predicted = torch.max(outputs, 1)
+        
+        y_pred.append(predicted.cpu().numpy())
+        y_gt.append(labels.cpu().numpy())
+        
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+    accuracy = 100.0 * correct / total
+    return  accuracy, y_gt, y_pred
 NUM_EPOCHS = 15
 
 
@@ -62,6 +84,11 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
+# Same training images without augmentation, only used to measure training accuracy
+train_eval_loader = DataLoader(Subset(train_dataset_normal, train_idx), batch_size=32, shuffle=False)
+
+# Folder for the saved model checkpoints
+os.makedirs("checkpoints", exist_ok=True)
 
 # --- Full fine-tuning ---
 # Substitute the final layer of the classifier with a new 37-output layer
@@ -81,7 +108,7 @@ print(f"Total parameters: {total_params:,} | Trainable: {trainable_params:,}")
 # Run training
 print("Training complete model with last layer changed")
 sync()
-best_val_accuracy, best_state = 0.0, None
+best_val_accuracy, best_state, best_epoch = 0.0, None, -1
 start = time.perf_counter()
 for EPOCH in range (NUM_EPOCHS):
   model.train()
@@ -101,60 +128,36 @@ for EPOCH in range (NUM_EPOCHS):
           print(f"Step [{step + 1}/{len(train_loader)}], Loss: {running_loss / 50:.4f}")
           running_loss = 0.0  
   # validation after each epoch
-  model.eval()
-  with torch.no_grad():
-    correct = 0
-    total = 0
-    for images, labels in val_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        
-        # Predicted class is index of highest logit along dimension 1
-        _, predicted = torch.max(outputs, 1)
-        
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-    val_accuracy = 100.0 * correct / total
-    print(f"Validation accuracy: {val_accuracy:.2f}% ({correct}/{total})")
-    # Keep the best checkpoint
-    if(val_accuracy > best_val_accuracy):
-      best_val_accuracy = val_accuracy
-      best_state = copy.deepcopy(model.state_dict())
+  val_accuracy, _, _ = get_accuracy(model, val_loader)
+  print(f"Validation accuracy: {val_accuracy:.2f}%")
+  # Keep the best checkpoint
+  if(val_accuracy > best_val_accuracy):
+    best_val_accuracy = val_accuracy
+    best_state = copy.deepcopy(model.state_dict())
+    best_epoch = EPOCH
 sync()
 train_time_finetune = time.perf_counter() - start
 
+print(f"Best epoch: {best_epoch} with accuracy: {best_val_accuracy}%")
 # Load the best checkpoint
 model.load_state_dict(best_state)
 # Evaluate top-1 accuracy on the test set
-model.eval()
-correct = 0
-total = 0
-
-# Save the true and predicted labes used later for confusion matrices
-y_gt_finetune, y_pred_finetune = [], []
-
 start = time.perf_counter()
-with torch.no_grad():
-    for images, labels in test_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        
-        # Predicted class is index of highest logit along dimension 1
-        _, predicted = torch.max(outputs, 1)
-        
-        y_pred_finetune.append(predicted.cpu().numpy())
-        y_gt_finetune.append(labels.cpu().numpy())
-        
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+# Save the true and predicted labes used later for confusion matrices
+test_acc_finetune, y_gt_finetune, y_pred_finetune = get_accuracy(model, test_loader)
+sync()
 eval_time_finetune = time.perf_counter() - start
 
 y_gt_finetune = np.concatenate(y_gt_finetune)
 y_pred_finetune = np.concatenate(y_pred_finetune)
-
-accuracy = 100.0 * correct / total
-print(f"Test Set Top-1 Accuracy: {accuracy:.2f}% ({correct}/{total})")
+print(f"Test Set Top-1 Accuracy: {test_acc_finetune:.2f}%")
 print(f"Training time: {train_time_finetune:.1f} s | Test evaluation time: {eval_time_finetune:.1f} s")
+
+# Training accuracy of the selected checkpoint (non-augmented training images)
+train_acc_finetune, _ , _ = get_accuracy(model, train_eval_loader)
+print(f"Training accuracy: {train_acc_finetune:.2f}%")
+
+torch.save(model.state_dict(), "checkpoints/full_finetuning.pt")
 
 # --- CLASSIFIER HEAD TRAINING ---
 # load a fresh model
@@ -181,7 +184,7 @@ criterion = nn.CrossEntropyLoss()
 # Run training
 print("\nTraining model with frozen convolutional layer and last layer changed")
 sync()
-best_val_accuracy, best_state = 0.0, None
+best_val_accuracy, best_state, best_epoch = 0.0, None, -1
 start = time.perf_counter()
 for EPOCH in range (NUM_EPOCHS):
   print(f"epoch: {EPOCH}") 
@@ -203,61 +206,37 @@ for EPOCH in range (NUM_EPOCHS):
           print(f"Step [{step + 1}/{len(train_loader)}], Loss: {running_loss / 50:.4f}")
           running_loss = 0.0
   # validation after each epoch
-  model.eval()
-  with torch.no_grad():
-    correct = 0
-    total = 0
-    for images, labels in val_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        
-        # Predicted class is index of highest logit along dimension 1
-        _, predicted = torch.max(outputs, 1)
-        
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-    val_accuracy = 100.0 * correct / total
-    print(f"Validation accuracy: {val_accuracy:.2f}% ({correct}/{total})")
-    # Keep only the best checkpoint
-    if(val_accuracy > best_val_accuracy):
-      best_val_accuracy = val_accuracy
-      best_state = copy.deepcopy(model.state_dict())
+  val_accuracy, _, _ = get_accuracy(model, val_loader)
+  print(f"Validation accuracy: {val_accuracy:.2f}%")
+  # Keep only the best checkpoint
+  if(val_accuracy > best_val_accuracy):
+    best_val_accuracy = val_accuracy
+    best_state = copy.deepcopy(model.state_dict())
+    best_epoch = EPOCH
 sync()
 train_time_head = time.perf_counter() - start
 
+print(f"Best epoch: {best_epoch} with accuracy: {best_val_accuracy}%")
 # Load the best epoch checkpoint
 model.load_state_dict(best_state)
 
 # Evaluate top-1 accuracy on the test set
-model.eval()
-correct = 0
-total = 0
-
-# Keep the true and predicted labels that will be used later for the confusion matrices
-y_gt_head, y_pred_head = [], []
-
 start = time.perf_counter()
-with torch.no_grad():
-    for images, labels in test_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        
-        # Predicted class is index of highest logit along dimension 1
-        _, predicted = torch.max(outputs, 1)
-
-        y_pred_head.append(predicted.cpu().numpy())
-        y_gt_head.append(labels.cpu().numpy())
-
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+# Keep the true and predicted labels that will be used later for the confusion matrices
+test_acc_head, y_gt_head, y_pred_head = get_accuracy(model, test_loader)
+sync()
 eval_time_head = time.perf_counter() - start
 
 y_gt_head = np.concatenate(y_gt_head)
 y_pred_head = np.concatenate(y_pred_head)
-
-accuracy = 100.0 * correct / total
-print(f"Test Set Top-1 Accuracy: {accuracy:.2f}% ({correct}/{total})")
+print(f"Test Set Top-1 Accuracy: {test_acc_head:.2f}%")
 print(f"Training time: {train_time_head:.1f} s | Test evaluation time: {eval_time_head:.1f} s")
+
+# Training accuracy of the selected checkpoint (non-augmented training images)
+train_acc_head, _, _ = get_accuracy(model, train_eval_loader)
+print(f"Training accuracy: {train_acc_head:.2f}%")
+
+torch.save(model.state_dict(), "checkpoints/classifier_head.pt")
 
 
 # --- Feature extraction with a traditional classifier ---
@@ -326,9 +305,19 @@ for c in C_values:
     best_logreg = logreg
 fit_time = time.perf_counter() - start
 
+test_acc_logreg = 100 * best_logreg.score(x_test_logistic, y_test_logistic)
 print(f"Selected C={best_c} (val acc {best_val_accuracy:.2f}%)")
-print(f"Top-1 accuracy: {100 * best_logreg.score(x_test_logistic, y_test_logistic):.2f}%")
-print(f"Feature extraction time (train + test): {extract_time:.1f} s | Logistic regression fit time: {fit_time:.1f} s")
+print(f"Top-1 accuracy: {test_acc_logreg:.2f}%")
+print(f"Feature extraction time (train + val + test): {extract_time:.1f} s | Logistic regression fit time: {fit_time:.1f} s")
+
+# Training accuracy on features of the non-augmented training images
+x_train_plain, y_train_plain = [], []
+with torch.no_grad():
+  for images, labels in train_eval_loader:
+    x_train_plain.append(model(images.to(device)).cpu().numpy())
+    y_train_plain.append(labels.numpy())
+train_acc_logreg = 100 * best_logreg.score(np.concatenate(x_train_plain), np.concatenate(y_train_plain))
+print(f"Training accuracy: {train_acc_logreg:.2f}%")
 
 # Get prediction labels for the logistic regression
 y_pred = best_logreg.predict(x_test_logistic)
