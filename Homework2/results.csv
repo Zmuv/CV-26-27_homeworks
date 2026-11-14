@@ -1,0 +1,4 @@
+approach,trainable_params,training_time_s,feature_extraction_time_s,classifier_fit_time_s,selected_model,train_acc,val_acc,test_acc,test_macro_f1
+Full fine-tuning,1555781,219.2,,,epoch 12,98.95,87.77,81.55,0.8107
+Classifier head,628773,128.8,,,epoch 9,98.37,88.72,85.39,0.8513
+Features + logistic regression,21349,45.7,44.3,1.4,C=0.001,95.24,87.91,85.06,0.8493
